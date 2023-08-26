@@ -84,7 +84,7 @@ def search(input_query):
     print("Search Results:\n",response_data)
     return response_data
 
-query="How did Jeff Bezos get rich?"
+query="Indians mission to Mars."
 search_results=search(query)
 # st.write(res)
 
@@ -123,7 +123,16 @@ def find_best_urls(search_results,query):
     
     return url_list
 
-results=find_best_urls(search_results,query)
+urls=find_best_urls(search_results,query)
 # st.markdown(results)
 
-##################### Search through web #####################
+##################### Load URLs to LLM #####################
+
+from langchain.document_loaders import UnstructuredURLLoader
+
+def get_content_from_URLs(urls):
+    loader=UnstructuredURLLoader(urls=urls)
+    return loader.load()
+
+content=get_content_from_URLs(urls)
+st.write(content)
