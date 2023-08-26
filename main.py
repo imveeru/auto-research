@@ -26,7 +26,6 @@ from google.auth import credentials
 from google.oauth2 import service_account
 import google.cloud.aiplatform as aiplatform
 import vertexai
-from vertexai.language_models import TextGenerationModel
 
 # config = st.secrets["GOOGLE_APPLICATION_CREDENTIALS"] #for deploying    
 config ='''{
@@ -85,5 +84,46 @@ def search(input_query):
     print("Search Results:\n",response_data)
     return response_data
 
-res=search("How did Jeff Bezos get rich?")
-st.write(res)
+query="How did Jeff Bezos get rich?"
+search_results=search(query)
+# st.write(res)
+
+##################### Search through web #####################
+
+from langchain.llms import VertexAI
+from langchain.chains import LLMChain
+from langchain import PromptTemplate
+
+def find_best_urls(search_results,query):
+    response_str=json.dumps(search_results)
+    llm=VertexAI()
+    
+    template='''
+    You are a world class journalist & researcher, you are extremely good at find most relevant articles to certain topic;
+    {response_str}
+    Above is the list of search results for the query {query}.
+    Please choose the best 3 articles from the list, return ONLY an array of the URLs, do not include anything else; retun ONLY an array of the URLs, do not include anything else.
+    '''
+    
+    prompt_template=PromptTemplate(
+        input_variables=["response_str","query"],
+        template=template
+    )
+    
+    article_picker_chain=LLMChain(
+        llm=llm,
+        prompt=prompt_template,
+        verbose=True
+    )
+    
+    urls=article_picker_chain.predict(response_str=response_str,query=query)
+    
+    url_list=json.loads(urls)
+    print(url_list)
+    
+    return url_list
+
+results=find_best_urls(search_results,query)
+# st.markdown(results)
+
+##################### Search through web #####################
