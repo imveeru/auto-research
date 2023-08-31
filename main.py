@@ -86,8 +86,8 @@ def search(input_query):
     print("Search Results:\n",response_data)
     return response_data
 
-# query="AI Chatbots in education"
-
+query="AI Chatbots in education"
+search_results=search(query)
 #st.write(search_results)
 
 ##################### Extract Paper & Make lit survey #####################
@@ -138,18 +138,32 @@ def create_lit_survey(search_results,query):
     return lit_survey
 
 
+##################### Extract Citations from results #####################
+def get_citations(search_results):
+    paper_data=search_results["data"]
+    citations=""
+    for paper in paper_data:
+        citation_list=paper["citationStyles"]
+        citation=citation_list["bibtex"]
+        citations+="\n"+citation
+    
+    return citations
+
 ##################### User Interface #####################
+
 query=st.text_input("Ask a research question or Type a topic to research on...")
 
 if st.button("Search"):
     with st.spinner("Searching for relevant papers..."):
         if query!=None and query!="" and len(query)>=3:
-            search_results=search(query)
+                search_results=search(query)
 
     if search_results:
         st.markdown("### Literature Survey")
         with st.spinner("Analysing the papers..."):
             lit_survey=create_lit_survey(search_results,query)
             st.markdown(lit_survey)
-
-    
+            
+            with st.expander("Bibliography"):
+                citations=get_citations(search_results)
+                st.code(citations)
