@@ -67,42 +67,57 @@ SERPAPI_API_KEY=os.getenv("SERPAPI_API_KEY")
 ##################### Search through web #####################
 
 def search(input_query):
-    url = "https://google.serper.dev/search"
+    # url = "https://google.serper.dev/search"
     
-    payload=json.dumps({
-        'q':input_query
-    })
+    # payload=json.dumps({
+    #     'q':input_query
+    # })
     
-    headers={
-        "X-API-KEY":SERPAPI_API_KEY,
-        "Content-Type":"application/json"
-    }
+    # headers={
+    #     "X-API-KEY":SERPAPI_API_KEY,
+    #     "Content-Type":"application/json"
+    # }
     
-    response=requests.request("POST",url,headers=headers,data=payload)
+    # response=requests.request("POST",url,headers=headers,data=payload)
+    url=f"https://api.semanticscholar.org/graph/v1/paper/search?query={input_query}&limit=10&fields=url,abstract,authors,tldr,year,title,citationStyles"
+    response=requests.request("GET",url)
     response_data=response.json()
     
     print("Search Results:\n",response_data)
     return response_data
 
-query="Indians mission to Mars."
-search_results=search(query)
-# st.write(res)
+# query="AI Chatbots in education"
 
-##################### Search through web #####################
+#st.write(search_results)
+
+##################### Extract Paper & Make lit survey #####################
 
 from langchain.llms import VertexAI
 from langchain.chains import LLMChain
 from langchain import PromptTemplate
 
-def find_best_urls(search_results,query):
+def create_lit_survey(search_results,query):
     response_str=json.dumps(search_results)
-    llm=VertexAI()
+    llm=VertexAI(max_output_tokens=1024,max_retries=6)
+    
+    # template='''
+    # You are a world class researcher, you are extremely good at find most relevant papers to certain topic;
+    # {response_str}
+    # Above is the list of search results for the query {query}.
+    # Please choose the best 5 papers from the list, return ONLY an array of the PaperID, do not include anything else; retun ONLY an array of the PaperID, do not include anything else.
+    # '''
     
     template='''
-    You are a world class journalist & researcher, you are extremely good at find most relevant articles to certain topic;
+    You are a world class researcher, you are extremely good at writing literature surveys on certain topic by using the given papers;
     {response_str}
     Above is the list of search results for the query {query}.
-    Please choose the best 3 articles from the list, return ONLY an array of the URLs, do not include anything else; retun ONLY an array of the URLs, do not include anything else.
+    Please write a comprehensive literature survey for the topic {query} using the given search results.
+    The literature survey must have a proper conclusion with mentioning a RESEARCH GAP. 
+    Avoid multiple sub headings and bullet points.
+    Compile the results of paper and find relation between its results and present them as PARAGRAPHS instead of points.
+    Proper CITATIONS must be added in the survey by mentioning the author name along with the year.
+    The output must be in ACADEMIC TONE.
+    Return ONLY the literature survey, do not include anything else;Return ONLY the literature survey, do not include anything else;Return ONLY the literature survey, do not include anything else;
     '''
     
     prompt_template=PromptTemplate(
@@ -110,67 +125,31 @@ def find_best_urls(search_results,query):
         template=template
     )
     
-    article_picker_chain=LLMChain(
+    writer_chain=LLMChain(
         llm=llm,
         prompt=prompt_template,
         verbose=True
     )
     
-    urls=article_picker_chain.predict(response_str=response_str,query=query)
+    lit_survey=writer_chain.predict(response_str=response_str,query=query)
+    # id_list=json.loads(ids)
+    # print(ids)
     
-    url_list=json.loads(urls)
-    print(url_list)
-    
-    return url_list
+    return lit_survey
 
-urls=find_best_urls(search_results,query)
-st.markdown(urls)
 
-##################### Load URLs to LLM #####################
+##################### User Interface #####################
+query=st.text_input("Ask a research question or Type a topic to research on...")
 
-from langchain.document_loaders import UnstructuredURLLoader
+if st.button("Search"):
+    with st.spinner("Searching for relevant papers..."):
+        if query!=None and query!="" and len(query)>=3:
+            search_results=search(query)
 
-def get_content_from_URLs(urls):
-    loader=UnstructuredURLLoader(urls=urls)
-    return loader.load()
+    if search_results:
+        st.markdown("### Literature Survey")
+        with st.spinner("Analysing the papers..."):
+            lit_survey=create_lit_survey(search_results,query)
+            st.markdown(lit_survey)
 
-content=get_content_from_URLs(urls)
-st.write(content)
-
-from langchain.text_splitter import CharacterTextSplitter
-
-def split_text(data,query):
-    text_splitter=CharacterTextSplitter(separator="\n",chunk_size=3000,chunk_overlap=200,length_function=len)
-    text=text_splitter.split_documents(data)
-    
-    llm=VertexAI(max_output_tokens=1024,max_retries=6,temperature=0.2)
-    template ='''
-        {text}
-        
-        You are a world class journalist, and you will try to summarize the text above in order to create a twitter thread about {query}
-        
-        Please follow all of the following rules:
-        1/ Make sure the content is engaging, informative with good data
-        2/ Make sure the content is not too tong, it should be no more than 5—7 tweets
-        3/ The content should address the {query} topic very welt
-        4/ The content needs to be viral, and get at least 1000 likes
-        5/ The content needs to be written in a way that is easy to read and understand
-        6/ The content needs to give audience actionable advice & insights too.
-        
-        SUMMARY:
-    '''
-    
-    prompt_template=PromptTemplate(input_variables=["text","query"],template=template)
-    summarization_chain=LLMChain(llm=llm,prompt=prompt_template,verbose=True)
-    
-    summaries=[]
-    
-    for chunk in enumerate(text):
-        summary=summarization_chain.predict(text=chunk, query=query)
-        summaries.append(summary)
-    
-    return summaries
-
-summaries=split_text(content,query)
-st.write(summaries)
     
