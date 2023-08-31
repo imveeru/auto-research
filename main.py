@@ -79,15 +79,18 @@ def search(input_query):
     # }
     
     # response=requests.request("POST",url,headers=headers,data=payload)
-    url=f"https://api.semanticscholar.org/graph/v1/paper/search?query={input_query}&limit=10&fields=url,abstract,authors,tldr,year,title,citationStyles"
+    url=f"https://api.semanticscholar.org/graph/v1/paper/search?query={input_query}&limit=3&fields=url,abstract,authors,tldr,year,title,citationStyles"
     response=requests.request("GET",url)
     response_data=response.json()
     
-    print("Search Results:\n",response_data)
-    return response_data
+    if response_data["total"]>=1:        
+        print("Search Results:\n",response_data)
+        return response_data
+    else:
+        return "No papers found!"
 
-query="AI Chatbots in education"
-search_results=search(query)
+# query="AI Chatbots in education"
+# search_results=search(query)
 #st.write(search_results)
 
 ##################### Extract Paper & Make lit survey #####################
@@ -113,6 +116,7 @@ def create_lit_survey(search_results,query):
     Above is the list of search results for the query {query}.
     Please write a comprehensive literature survey for the topic {query} using the given search results.
     The literature survey must have a proper conclusion with mentioning a RESEARCH GAP. 
+    If no papers are found, do not hallucinate and write a literature survey. Just output no relevant paper are found.
     Avoid multiple sub headings and bullet points.
     Compile the results of paper and find relation between its results and present them as PARAGRAPHS instead of points.
     Proper CITATIONS must be added in the survey by mentioning the author name along with the year.
@@ -133,14 +137,17 @@ def create_lit_survey(search_results,query):
     
     lit_survey=writer_chain.predict(response_str=response_str,query=query)
     # id_list=json.loads(ids)
-    # print(ids)
+    print("LitSurvey",lit_survey)
     
     return lit_survey
 
 
 ##################### Extract Citations from results #####################
 def get_citations(search_results):
-    paper_data=search_results["data"]
+    if search_results:
+        paper_data=search_results["data"]
+    else:
+        return "No results found!"
     citations=""
     for paper in paper_data:
         citation_list=paper["citationStyles"]
